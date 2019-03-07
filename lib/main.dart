@@ -1,4 +1,70 @@
 import 'package:flutter/material.dart';
+import 'package:duration/duration.dart';
+import 'package:quiver/async.dart';
+
+enum EPomodoroActions {
+  work,
+  shortBreak,
+  longBreak,
+}
+
+class PomodoroConfig {
+  String type;
+  int interval;
+}
+
+class Pomodoro {
+  final _speed = 1;
+  var _status = {
+    'type': 'none',
+    'timer': 0,
+    'next': 'work',
+  };
+  var _timer;
+  var _results = {
+    'work': 0,
+    'shortBreak': 0,
+    'longBreak': 0,
+  };
+
+  final _config = {
+    'work': {
+      'duration': 25,
+    },
+    'shortBreak': {
+      'duration': 5,
+    },
+    'longBreak': {
+      'duration': 15,
+    },
+  };
+
+  start(String type, cb) {
+    final duration = _config[type]['duration'];
+    final durationInMinutes = Duration(minutes: duration);
+    final Duration speed = Duration(seconds: _speed);
+
+    _timer =
+        CountdownTimer(durationInMinutes, speed).listen((CountdownTimer t) {
+      print(t.remaining);
+      cb(t);
+    });
+  }
+
+  pause(String type) {}
+
+  stop() {
+    _timer?.cancel();
+  }
+
+  onData(cb) {
+    _timer.onData(cb);
+  }
+
+  getNext() {
+    return _status['next'];
+  }
+}
 
 void main() => runApp(MyApp());
 
@@ -9,16 +75,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Flutter Demo',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.red,
       ),
       home: MyHomePage(title: 'Flutter Demo Home Page'),
     );
@@ -28,15 +85,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -44,68 +92,125 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  String _remaningTime = '25m:0s';
+  bool _started = false;
+  EPomodoroActions type = EPomodoroActions.work;
+  Pomodoro _pomodoro = Pomodoro();
 
-  void _incrementCounter() {
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _pomodoro.stop();
+    super.dispose();
+  }
+
+  _updateTimer(CountdownTimer t) {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      var dur = t.remaining;
+      _remaningTime = printDuration(
+        dur,
+        abbreviated: true,
+        delimiter: ':',
+        tersity: DurationTersity.second,
+      );
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonAnimator: FloatingActionButtonAnimator.scaling,
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
+        actions: <Widget>[
+          PopupMenuButton<EPomodoroActions>(
+            onSelected: (EPomodoroActions result) {
+              print(result);
+              _pomodoro.stop();
+              _pomodoro.start("${result.toString().split('.').last}", _updateTimer);
+              setState(() {
+                _started = true;
+              });
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuItem<EPomodoroActions>>[
+              const PopupMenuItem<EPomodoroActions>(
+                value: EPomodoroActions.work,
+                  child: Text('Inicia un Pomodoro'),
+              ),
+              const PopupMenuItem<EPomodoroActions>(
+                value: EPomodoroActions.shortBreak,
+                  child: Text('Inicia un descanso')
+              ),
+              const PopupMenuItem<EPomodoroActions>(
+                  value: EPomodoroActions.longBreak,
+                  child: Text('Inicia un descanso largo')
+              )
+            ],
+          )
+        ],
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Invoke "debug painting" (press "p" in the console, choose the
-          // "Toggle Debug Paint" action from the Flutter Inspector in Android
-          // Studio, or the "Toggle Debug Paint" command in Visual Studio Code)
-          // to see the wireframe for each widget.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
+              '$_remaningTime',
               style: Theme.of(context).textTheme.display1,
             ),
           ],
         ),
       ),
+      drawer: Drawer(
+          child: ListView(
+        children: <Widget>[
+          DrawerHeader(
+            child: Text('Pomodoro'),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              image: DecorationImage(
+                image: AssetImage('data_repo/tomate.png'),
+                fit: BoxFit.contain,
+              )
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.data_usage),
+            title: Text('Resultados'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            leading: Icon(Icons.exit_to_app),
+            title: Text('Volver'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          )
+        ],
+      )),
       floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+        tooltip: 'Start',
+        child: Icon(_started ? Icons.stop : Icons.play_arrow),
+        onPressed: () {
+          setState(() {
+            if (_started) {
+              _pomodoro.stop();
+              _remaningTime = '25m:0s';
+            } else {
+              _pomodoro.start(_pomodoro.getNext(), _updateTimer);
+            }
+            _started = !_started;;
+
+          });
+        },
+      ),
     );
   }
 }
